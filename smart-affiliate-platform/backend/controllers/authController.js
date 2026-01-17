@@ -12,86 +12,93 @@ const generateOTP = () => {
 
 /**
  * Universal Login Endpoint
- * - Admin: requires password verification via bcrypt
- * - User: passwordless auto-register
  */
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
-    }
+    if (!email) return res.status(400).json({ error: "Email is required" });
 
     const adminEmail = process.env.ADMIN_EMAIL || "bhsrinivas94@gmail.com";
-
-    // Admin Login
-    if (email === adminEmail) {
-      if (!password) {
-        return res.status(400).json({ error: "Password required for admin" });
-      }
-
-      let admin = await User.findOne({ email });
-
-      if (!admin) {
-        return res.status(401).json({ error: "Invalid admin credentials" });
-      }
-
-      const isPasswordValid = await admin.comparePassword(password);
-
-      if (!isPasswordValid) {
-        return res.status(401).json({ error: "Invalid admin credentials" });
-      }
-
-      const token = generateToken(admin);
-
-      return res.json({
-        success: true,
-        message: "Admin login successful",
-        token,
-        user: {
-          id: admin._id,
-          email: admin.email,
-          role: admin.role,
-          name: admin.name,
-        },
-      });
-    }
-
-    // User Login (Passwordless)
     let user = await User.findOne({ email });
 
+    // Admin Login Logic
+    if (email === adminEmail) {
+      if (!password) return res.status(400).json({ error: "Password required for admin" });
+      if (!user) return res.status(401).json({ error: "Invalid admin credentials" });
+      const isPasswordValid = await user.comparePassword(password);
+      if (!isPasswordValid) return res.status(401).json({ error: "Invalid admin credentials" });
+    }
+
+    // User Auto-Register Logic
     if (!user) {
-      // Auto-register new user
       user = await User.create({
         email,
         role: "user",
         isEmailVerified: false,
+        lastActive: Date.now()
       });
-
-      // Send welcome email
-      try {
-        await sendWelcomeEmail(email, "");
-      } catch (err) {
-        console.error("Welcome email failed:", err.message);
-      }
+      try { await sendWelcomeEmail(email, ""); } catch (err) { console.error("Email failed", err); }
+    } else {
+      // Update activity on existing user login
+      user.lastActive = Date.now();
+      await user.save();
     }
 
     const token = generateToken(user);
-
     return res.json({
       success: true,
-      message: "User login successful",
+      message: "Login successful",
       token,
-      user: {
-        id: user._id,
-        email: user.email,
-        role: user.role,
-        name: user.name,
-      },
+      user: { id: user._id, email: user.email, role: user.role, name: user.name },
     });
   } catch (error) {
-    console.error("Login error:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * HEARTBEAT: Updates user's lastActive timestamp while they are online
+ */
+exports.updateHeartbeat = async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(req.user.id, { lastActive: Date.now() });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * LOGOUT: Instantly hides user from "Live Now" count
+ */
+exports.logout = async (req, res) => {
+  try {
+    // Set lastActive to 10 minutes ago so they vanish from analytics immediately
+    await User.findByIdAndUpdate(req.user.id, { 
+      lastActive: new Date(Date.now() - 10 * 60 * 1000) 
+    });
+    res.json({ success: true, message: "Logged out" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * GET ANALYTICS: Real-Time "Live Now" Logic
+ */
+exports.getUserStats = async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments({ role: "user" });
+
+    // Live Now: Pinged within the last 5 minutes
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const activeUsers = await User.countDocuments({
+      role: "user",
+      lastActive: { $gte: fiveMinutesAgo },
+    });
+
+    res.json({ success: true, stats: { totalUsers, activeUsers } });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
@@ -102,45 +109,17 @@ exports.login = async (req, res) => {
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
-    }
-
     const user = await User.findOne({ email });
-
-    if (!user) {
-      // Don't reveal if user exists
-      return res.json({
-        success: true,
-        message: "If email exists, OTP will be sent",
-      });
-    }
+    if (!user) return res.json({ success: true, message: "If email exists, OTP will be sent" });
 
     const otp = generateOTP();
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
     user.otp = otp;
-    user.otpExpiry = otpExpiry;
+    user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
-    // Send OTP email (non-blocking - OTP is saved even if email fails)
-    try {
-      await sendOTPEmail(email, otp);
-      console.log(`✅ OTP email sent successfully to ${email}`);
-    } catch (err) {
-      console.error("⚠️ OTP email failed (OTP still saved):", err.message);
-      console.log(`📝 OTP for ${email}: ${otp} (Email failed to send. Check server logs.)`);
-      // Don't fail the request - OTP is saved, user can still reset password manually
-    }
-
-    // We removed the code that sent the OTP in the response here
-    res.json({
-      success: true,
-      message: "OTP sent successfully. Please check your Gmail inbox.",
-    });
+    await sendOTPEmail(email, otp);
+    res.json({ success: true, message: "OTP sent successfully" });
   } catch (error) {
-    console.error("Forgot password error:", error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -151,25 +130,10 @@ exports.forgotPassword = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
-
-    if (!email || !otp || !newPassword) {
-      return res.status(400).json({
-        error: "Email, OTP, and new password are required",
-      });
-    }
-
     const user = await User.findOne({ email });
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    if (!user.otp || user.otp !== otp) {
-      return res.status(401).json({ error: "Invalid OTP" });
-    }
-
-    if (new Date() > user.otpExpiry) {
-      return res.status(401).json({ error: "OTP expired" });
+    if (!user || user.otp !== otp || new Date() > user.otpExpiry) {
+      return res.status(401).json({ error: "Invalid or expired OTP" });
     }
 
     user.password = newPassword;
@@ -177,12 +141,8 @@ exports.resetPassword = async (req, res) => {
     user.otpExpiry = null;
     await user.save();
 
-    res.json({
-      success: true,
-      message: "Password reset successfully",
-    });
+    res.json({ success: true, message: "Password reset successfully" });
   } catch (error) {
-    console.error("Reset password error:", error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -193,17 +153,9 @@ exports.resetPassword = async (req, res) => {
 exports.getCurrentUser = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password -otp");
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    res.json({
-      success: true,
-      user,
-    });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json({ success: true, user });
   } catch (error) {
-    console.error("Get user error:", error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -213,50 +165,24 @@ exports.getCurrentUser = async (req, res) => {
  */
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, phone, preferences } = req.body;
-
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      {
-        name,
-        phone,
-        preferences,
-      },
-      { new: true }
-    );
-
-    res.json({
-      success: true,
-      message: "Profile updated",
-      user,
-    });
+    const { name } = req.body;
+    const user = await User.findByIdAndUpdate(req.user.id, { name }, { new: true }).select("-password -otp");
+    res.json({ success: true, message: "Profile updated", user });
   } catch (error) {
-    console.error("Update profile error:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
 /**
- * Password Strength Validator
+ * Permanently delete account
  */
-const validatePasswordStrength = (password) => {
-  const requirements = {
-    minLength: password.length >= 12,
-    hasUpperCase: /[A-Z]/.test(password),
-    hasLowerCase: /[a-z]/.test(password),
-    hasNumbers: /[0-9]/.test(password),
-    hasSpecialChars: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
-  };
-
-  const isStrong = Object.values(requirements).every((req) => req);
-
-  return {
-    isStrong,
-    requirements,
-    message: !isStrong
-      ? `Password must contain: at least 12 characters, uppercase letters, lowercase letters, numbers, and special characters`
-      : null,
-  };
+exports.deleteAccount = async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.user.id);
+    res.json({ success: true, message: "Account deleted" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
 /**
@@ -267,78 +193,30 @@ exports.setupAdmin = async (req, res) => {
     const { password, name } = req.body;
     const adminEmail = process.env.ADMIN_EMAIL || "bhsrinivas94@gmail.com";
 
-    if (!password) {
-      return res.status(400).json({ error: "Password is required" });
-    }
-
-    // Validate password strength
-    const passwordValidation = validatePasswordStrength(password);
-    if (!passwordValidation.isStrong) {
-      return res.status(400).json({
-        error: passwordValidation.message,
-        requirements: passwordValidation.requirements,
-      });
-    }
-
-    // Check if admin account already exists with password
     let admin = await User.findOne({ email: adminEmail });
-
-    if (admin && admin.password) {
-      return res.status(403).json({
-        error: "Admin account already initialized. Use forgot-password to reset.",
-      });
-    }
+    if (admin && admin.password) return res.status(403).json({ error: "Admin already setup" });
 
     if (!admin) {
-      // Create new admin account
-      admin = new User({
-        email: adminEmail,
-        role: "admin",
-        name: name || "Admin",
-        isEmailVerified: true,
-      });
-    } else {
-      // Update existing admin account
-      admin.name = name || admin.name || "Admin";
-      admin.role = "admin"; // Explicitly set role to admin
+      admin = new User({ email: adminEmail, role: "admin", name: name || "Admin", isEmailVerified: true });
     }
-
     admin.password = password;
     await admin.save();
 
-    res.json({
-      success: true,
-      message: "Admin account setup successfully",
-      admin: {
-        id: admin._id,
-        email: admin.email,
-        name: admin.name,
-        role: admin.role,
-      },
-    });
+    res.json({ success: true, message: "Admin setup successful" });
   } catch (error) {
-    console.error("Admin setup error:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
 /**
- * Check Admin Setup Status
+ * Check Admin Status
  */
 exports.checkAdminStatus = async (req, res) => {
   try {
     const adminEmail = process.env.ADMIN_EMAIL || "bhsrinivas94@gmail.com";
     const admin = await User.findOne({ email: adminEmail });
-
-    const isSetup = admin && admin.password ? true : false;
-
-    res.json({
-      success: true,
-      isAdminSetup: isSetup,
-      adminEmail: adminEmail,
-    });
+    res.json({ success: true, isAdminSetup: !!(admin && admin.password), adminEmail });
   } catch (error) {
-    console.error("Check admin status error:", error);
     res.status(500).json({ error: error.message });
   }
 };
