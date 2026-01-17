@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Products - Admin Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50">
+    <!-- Admin Navbar -->
+    <nav class="bg-white shadow-lg">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <a href="/admin/dashboard" class="text-2xl font-bold text-blue-600">🛍️ Admin Panel</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Excel-like Product Add Form -->
+    <div class="container mx-auto px-4 py-8">
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-900">Add Products (Excel-like)</h2>
+                <button class="text-gray-500 hover:text-gray-700 text-xl font-bold">✕</button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse border border-gray-300">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="border border-gray-300 p-2 text-left">Image URL</th>
+                            <th class="border border-gray-300 p-2 text-left">Affiliate Link</th>
+                            <th class="border border-gray-300 p-2 text-left">Title</th>
+                            <th class="border border-gray-300 p-2 text-left">Price</th>
+                            <th class="border border-gray-300 p-2 text-left">Original Price</th>
+                            <th class="border border-gray-300 p-2 text-left">Category</th>
+                            <th class="border border-gray-300 p-2 text-left">Platform</th>
+                            <th class="border border-gray-300 p-2 text-left">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="border border-gray-300 p-2">
+                                <input type="text" placeholder="Image URL" class="w-full px-2 py-1 border border-gray-200 rounded text-sm" />
+                            </td>
+                            <td class="border border-gray-300 p-2">
+                                <input type="text" placeholder="Affiliate Link" class="w-full px-2 py-1 border border-gray-200 rounded text-sm" />
+                            </td>
+                            <td class="border border-gray-300 p-2">
+                                <input type="text" placeholder="Product Title" class="w-full px-2 py-1 border border-gray-200 rounded text-sm" />
+                            </td>
+                            <td class="border border-gray-300 p-2">
+                                <input type="number" placeholder="Price" class="w-full px-2 py-1 border border-gray-200 rounded text-sm" />
+                            </td>
+                            <td class="border border-gray-300 p-2">
+                                <input type="number" placeholder="Original Price" class="w-full px-2 py-1 border border-gray-200 rounded text-sm" />
+                            </td>
+                            <td class="border border-gray-300 p-2">
+                                <input type="text" placeholder="Category" class="w-full px-2 py-1 border border-gray-200 rounded text-sm" />
+                            </td>
+                            <td class="border border-gray-300 p-2">
+                                <span class="text-sm font-semibold text-blue-600">Auto-detect</span>
+                            </td>
+                            <td class="border border-gray-300 p-2">
+                                <button class="text-red-600 hover:text-red-800 text-sm font-bold">Remove</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-4 flex gap-4">
+                <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-semibold">
+                    ➕ Add Row
+                </button>
+                <button class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-semibold">
+                    💾 Save Products
+                </button>
+            </div>
+
+            <div class="mt-4 bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                <p class="text-sm text-blue-800">
+                    <strong>Note:</strong> For Amazon products, price will be auto-fetched from PA-API.
+                    For other platforms, please enter the price manually.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
