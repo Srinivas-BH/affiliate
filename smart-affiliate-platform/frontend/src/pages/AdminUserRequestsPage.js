@@ -186,31 +186,72 @@ export default function AdminUserRequestsPage() {
                   </div>
                 </div>
 
-                <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">
-                    Parsed Information:
-                  </p>
-                  <div className="grid md:grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="font-semibold">Category:</span>{" "}
-                      {request.parsedTags?.category || "Not specified"}
+                <div className="bg-blue-50 rounded p-3 mb-3 border-l-4 border-blue-500">
+                  <div className="space-y-1.5">
+                    {/* Line 1: Category, Price, Platform */}
+                    <div className="flex flex-wrap gap-4 items-center text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-600 font-semibold">Category:</span>
+                        {request.parsedTags?.category ? (
+                          <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-semibold">
+                            {request.parsedTags.category}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">Not detected</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-600 font-semibold">Price:</span>
+                        {request.parsedTags?.maxPrice ? (
+                          <span className="text-green-600 font-semibold">
+                            ₹{request.parsedTags.maxPrice.toLocaleString("en-IN")}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">No limit</span>
+                        )}
+                        {request.parsedTags?.minPrice > 0 && (
+                          <span className="text-blue-600 text-xs">
+                            - ₹{request.parsedTags.minPrice.toLocaleString("en-IN")}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-600 font-semibold">Platform:</span>
+                        {request.parsedTags?.platforms?.length > 0 ? (
+                          <div className="flex gap-1">
+                            {request.parsedTags.platforms.map((platform) => (
+                              <span
+                                key={platform}
+                                className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-semibold text-xs"
+                              >
+                                {platform}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">Any</span>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <span className="font-semibold">Max Price:</span>{" "}
-                      {request.parsedTags?.maxPrice
-                        ? `₹${request.parsedTags.maxPrice.toLocaleString()}`
-                        : "No limit"}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Platforms:</span>{" "}
-                      {request.parsedTags?.platforms?.length > 0
-                        ? request.parsedTags.platforms.join(", ")
-                        : "Any"}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Tags:</span>{" "}
-                      {request.parsedTags?.tags?.join(", ") || "None"}
-                    </div>
+
+                    {/* Line 2: Tags/Specs */}
+                    {request.parsedTags?.tags?.length > 0 && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-gray-600 font-semibold">Specs:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {request.parsedTags.tags.map((tag, idx) => (
+                            <span
+                              key={idx}
+                              className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-semibold"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
