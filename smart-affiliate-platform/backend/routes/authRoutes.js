@@ -5,10 +5,14 @@ const {
   resetPassword,
   getCurrentUser,
   updateProfile,
+  deleteAccount,
   setupAdmin,
   checkAdminStatus,
+  getUserStats,
+  updateHeartbeat,
+  logout, // <--- ADD THIS LINE
 } = require("../controllers/authController");
-const { authMiddleware } = require("../middleware/authMiddleware");
+const { authMiddleware, adminOnly } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
@@ -22,5 +26,11 @@ router.get("/admin-status", checkAdminStatus);
 // Protected routes
 router.get("/me", authMiddleware, getCurrentUser);
 router.put("/profile", authMiddleware, updateProfile);
+router.delete("/profile", authMiddleware, deleteAccount);
+router.post("/heartbeat", authMiddleware, updateHeartbeat);
+router.post("/logout", authMiddleware, logout); // <--- NOW THIS WILL WORK
+
+// Admin Analytics
+router.get("/admin/stats", authMiddleware, adminOnly, getUserStats);
 
 module.exports = router;

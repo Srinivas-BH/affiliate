@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import HeartbeatTracker from "./components/HeartbeatTracker";
 
 // Pages
 import HomePage from "./pages/HomePage";
@@ -25,6 +26,8 @@ function App() {
   return (
     <AuthProvider>
       <Router>
+        {/* The HeartbeatTracker runs globally to update "Live Now" status */}
+        <HeartbeatTracker />
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />

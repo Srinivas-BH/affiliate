@@ -22,19 +22,14 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem("user", JSON.stringify(response.user));
         } catch (error) {
           console.error("Fetch user error:", error);
-          // Only clear if token is truly invalid (401)
           if (error.response?.status === 401) {
             localStorage.removeItem("token");
             localStorage.removeItem("user");
             setToken(null);
             setUser(null);
-          } else {
-            // For other errors, keep the user from localStorage
-            console.warn("Failed to fetch user, using cached data");
           }
         }
       } else {
-        // No token, clear user
         setUser(null);
         localStorage.removeItem("user");
       }
@@ -48,20 +43,15 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await api.post("/auth/login", { email, password });
       
-      // Validate response
       if (!response || !response.token || !response.user) {
         throw new Error("Invalid response from server");
       }
       
-      // Save to localStorage first
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
       
-      // Update state
       setToken(response.token);
       setUser(response.user);
-      
-      console.log("Login successful - User:", response.user.email, "Role:", response.user.role);
       
       return response;
     } catch (error) {
@@ -75,6 +65,16 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+  };
+
+  const deleteAccount = async () => {
+    try {
+      await api.delete("/auth/profile");
+      logout();
+    } catch (error) {
+      console.error("Delete account error:", error);
+      throw error;
+    }
   };
 
   const forgotPassword = async (email) => {
@@ -92,10 +92,8 @@ export const AuthProvider = ({ children }) => {
     return response;
   };
 
-  // Check if admin - use user from state or localStorage
   const checkIsAdmin = () => {
     if (user?.role === "admin") return true;
-    // Fallback: check localStorage if user not loaded yet
     if (!user && token) {
       try {
         const savedUser = localStorage.getItem("user");
@@ -104,7 +102,7 @@ export const AuthProvider = ({ children }) => {
           return parsedUser?.role === "admin";
         }
       } catch (e) {
-        // Ignore parse errors
+        return false;
       }
     }
     return false;
@@ -118,6 +116,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         logout,
+        deleteAccount,
         forgotPassword,
         resetPassword,
         updateProfile,

@@ -44,22 +44,17 @@ const userSchema = new mongoose.Schema(
       maxPrice: Number,
       platforms: [String],
     },
-    createdAt: {
+    // ADDED: For Real-time tracking
+    lastActive: {
       type: Date,
-      default: Date.now,
-    },
-    updatedAt: {
-      type: Date,
-      default: Date.now,
-    },
+      default: Date.now
+    }
   },
   { timestamps: true }
 );
 
-// Hash password before saving (only if password is provided)
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password") || !this.password) return next();
-
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
@@ -69,7 +64,6 @@ userSchema.pre("save", async function (next) {
   }
 });
 
-// Method to compare passwords
 userSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
