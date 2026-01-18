@@ -19,7 +19,13 @@ export const AuthProvider = ({ children }) => {
           setUser(response.user);
           localStorage.setItem("user", JSON.stringify(response.user));
         } catch (error) {
-          if (error.response?.status === 401) logout();
+          if (error.response?.status === 401) {
+            // Silently logout if token is invalid
+            setUser(null);
+            setToken(null);
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+          }
         }
       }
       setLoading(false);
@@ -27,9 +33,8 @@ export const AuthProvider = ({ children }) => {
     fetchUser();
   }, [token]);
 
-  // [NEW] Step 1: Send Email to Backend
+  // Step 1: Send Email to Backend
   const initiateLogin = async (email) => {
-    // Returns { mode: 'PASSWORD' } or { mode: 'OTP' }
     return await api.post("/auth/login-init", { email });
   };
 
@@ -46,11 +51,22 @@ export const AuthProvider = ({ children }) => {
     return response;
   };
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+  // [UPDATED] Logout: Notify backend -> Clear local data
+  const logout = async () => {
+    try {
+      // 1. Tell server to set lastActive to past
+      if (token) {
+        await api.post("/auth/logout");
+      }
+    } catch (error) {
+      console.error("Logout server error:", error);
+    } finally {
+      // 2. Always clear local state
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+    }
   };
 
   // Other utilities...
@@ -59,13 +75,14 @@ export const AuthProvider = ({ children }) => {
   const updateProfile = async (data) => {
     const res = await api.put("/auth/profile", data);
     setUser(res.user);
+    localStorage.setItem("user", JSON.stringify(res.user)); // Ensure local storage is updated
     return res;
   };
 
   return (
     <AuthContext.Provider value={{
       user, token, loading,
-      initiateLogin, // Exposed to LoginPage
+      initiateLogin,
       login, logout, forgotPassword, resetPassword, updateProfile,
       isLoggedIn: !!token,
       isAdmin: user?.role === "admin"
