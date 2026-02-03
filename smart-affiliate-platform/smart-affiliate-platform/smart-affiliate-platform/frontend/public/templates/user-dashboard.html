@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - DIS-CYRA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50">
+    <!-- Navbar -->
+    <nav class="bg-white shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <a href="/dashboard" class="text-2xl font-bold text-blue-600">🛍️ DIS-CYRA</a>
+                <div class="flex items-center gap-6">
+                    <a href="/dashboard" class="text-gray-700 hover:text-blue-600 font-semibold">Home</a>
+                    <div class="relative">
+                        <button class="text-gray-700 hover:text-blue-600 font-semibold">Category ▼</button>
+                        <!-- Dropdown menu -->
+                    </div>
+                    <a href="/wishlist" class="text-gray-700 hover:text-blue-600 font-semibold">Wishlist</a>
+                    <a href="/about" class="text-gray-700 hover:text-blue-600 font-semibold">About</a>
+                    <a href="/write-to-us" class="text-gray-700 hover:text-blue-600 font-semibold">Write to Us</a>
+                    <a href="/profile" class="text-gray-700 hover:text-blue-600 font-semibold">Profile</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Search Bar -->
+    <div class="bg-white shadow-md py-4">
+        <div class="container mx-auto px-4">
+            <div class="max-w-2xl mx-auto">
+                <input
+                    type="text"
+                    placeholder="🔍 Search products..."
+                    class="w-full px-6 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-lg"
+                />
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">🏠 Home - All Products</h1>
+
+        <!-- Products Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- Product Card Template -->
+            <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer overflow-hidden">
+                <!-- Product Image -->
+                <div class="relative h-64 bg-gray-200 overflow-hidden">
+                    <img src="https://via.placeholder.com/300" alt="Product" class="w-full h-full object-cover" />
+                    <div class="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+                        20% OFF
+                    </div>
+                    <div class="absolute top-3 left-3 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                        AMAZON
+                    </div>
+                </div>
+                <!-- Product Info -->
+                <div class="p-4">
+                    <p class="text-xs text-gray-500 uppercase font-semibold mb-1">Electronics</p>
+                    <h3 class="font-bold text-gray-900 mb-2 line-clamp-2">Product Title Here</h3>
+                    <div class="flex items-baseline gap-2 mb-3">
+                        <span class="text-2xl font-bold text-blue-600">₹2,999</span>
+                        <span class="text-sm text-gray-400 line-through">₹4,999</span>
+                    </div>
+                    <button class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition">
+                        View Details
+                    </button>
+                </div>
+            </div>
+            <!-- Repeat product cards as needed -->
+        </div>
+    </div>
+</body>
+</html>

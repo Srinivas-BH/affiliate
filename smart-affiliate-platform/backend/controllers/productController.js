@@ -5,7 +5,8 @@ const { extractAsin } = require("../utils/detectPlatform");
 const { sendProductNotification } = require("../utils/mailer");
 
 /**
- * Add new product (Admin only)
+ * ADD NEW PRODUCT (Admin only)
+ * Detects platform strategy and fetches data if applicable
  */
 exports.addProduct = async (req, res) => {
   try {
@@ -18,19 +19,32 @@ exports.addProduct = async (req, res) => {
     if (strategy.name === "AMAZON_API") {
       const asin = extractAsin(affiliateLink);
       if (!asin) return res.status(400).json({ error: "Invalid Amazon URL." });
+      
       try {
         const fetchedData = await strategy.fetchProductData(asin);
-        productData = strategy.formatProductData({ ...fetchedData, category: category || "General", tags: tags || [] }, affiliateLink);
+        productData = strategy.formatProductData({ 
+          ...fetchedData, 
+          category: category || "General" 
+        }, affiliateLink);
       } catch (error) {
-        productData = strategy.formatProductData({ title, description, category, tags, price, originalPrice, discount, imageUrl }, affiliateLink);
+        // Fallback for Amazon if API fails, still tagged as AMAZON platform
+        productData = strategy.formatProductData({ 
+          title, description, category, price, imageUrl 
+        }, affiliateLink);
       }
     } else {
-      productData = strategy.formatProductData({ title, description, category, tags, price, originalPrice, discount, imageUrl }, affiliateLink);
+      // Logic for Meesho, Flipkart, Myntra, etc.
+      productData = strategy.formatProductData({ 
+        title, description, category, price, imageUrl 
+      }, affiliateLink);
     }
 
     productData.createdBy = req.user.id;
     const product = await Product.create(productData);
+    
+    // Trigger notification service
     await exports.saveAndNotify(product);
+    
     res.status(201).json({ success: true, product });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -38,73 +52,99 @@ exports.addProduct = async (req, res) => {
 };
 
 /**
- * Save product and notify matching user requests
- */
-exports.saveAndNotify = async (product) => {
-  try {
-    const matches = await UserRequest.find({
-      "parsedTags.category": { $regex: product.category, $options: "i" },
-      isFulfilled: false,
-      status: "ACTIVE",
-    });
-
-    for (const request of matches) {
-      if (request.parsedTags.maxPrice && product.price > request.parsedTags.maxPrice) continue;
-      if (request.parsedTags.minPrice && product.price < request.parsedTags.minPrice) continue;
-      if (request.parsedTags.platforms && request.parsedTags.platforms.length > 0) {
-        if (!request.parsedTags.platforms.includes(product.platform)) continue;
-      }
-
-      try {
-        await sendProductNotification(request.userEmail, product);
-        const alreadyMatched = request.matchedProducts.some((id) => id.toString() === product._id.toString());
-
-        if (!alreadyMatched) {
-          request.matchedProducts.push(product._id);
-          request.notificationsSent.push({ productId: product._id, sentAt: new Date() });
-        }
-
-        if (request.matchedProducts.length >= 1) {
-          request.isFulfilled = true;
-          request.status = "FULFILLED";
-        }
-        await request.save();
-      } catch (err) {
-        console.error(`Failed to notify ${request.userEmail}:`, err.message);
-      }
-    }
-  } catch (error) {
-    console.error("SaveAndNotify error", error);
-  }
-};
-
-/**
- * Get all products (User view)
+ * GET ALL PRODUCTS (Public & Admin)
+ * Implements strict platform filtering to stop "leaking"
  */
 exports.getAllProducts = async (req, res) => {
   try {
-    const { category, search, page = 1, limit = 20 } = req.query;
+    const { platform, category, search, page = 1, limit = 50 } = req.query; 
     const filter = { freshness: "FRESH" };
+
+    // STRICT FILTER: Check if platform is explicitly requested (e.g., MEESHO)
+    if (platform && platform.toUpperCase() !== "ALL") {
+      filter.platform = platform.toUpperCase();
+    }
+
     if (category) filter.category = { $regex: category, $options: "i" };
     if (search) filter.title = { $regex: search, $options: "i" };
 
     const skip = (page - 1) * limit;
-    const products = await Product.find(filter).skip(skip).limit(parseInt(limit)).sort({ createdAt: -1 });
+    const products = await Product.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+      
     const total = await Product.countDocuments(filter);
     
-    await Product.updateMany({ _id: { $in: products.map(p => p._id) } }, { $inc: { views: 1 } });
-    res.json({ success: true, products, pagination: { total, pages: Math.ceil(total / limit) } });
+    res.json({ 
+      success: true, 
+      count: products.length,
+      products,
+      pagination: { total, pages: Math.ceil(total / limit), currentPage: parseInt(page) }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
 /**
- * Get product by ID
+ * GET PRODUCT STATS (Admin Analytics)
+ * Returns aggregated data for the Analytics Dashboard
+ */
+exports.getProductStats = async (req, res) => {
+  try {
+    const stats = await Product.aggregate([
+      {
+        $project: {
+          _id: 1, 
+          productName: { $ifNull: ["$title", "Unknown Product"] },
+          // Send original platform case or default to OTHER
+          platform: { $toUpper: { $ifNull: ["$platform", "OTHER"] } },
+          category: { $ifNull: ["$category", "Uncategorized"] },
+          imageUrl: { $ifNull: ["$imageUrl", ""] },
+          totalClicks: { $ifNull: ["$clicks", 0] },
+          totalViews: { $ifNull: ["$views", 0] },
+          avgPrice: { $ifNull: ["$price", 0] }
+        }
+      },
+      { $sort: { totalViews: -1 } }
+    ]);
+    
+    res.json({ success: true, stats });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * TRACK CLICK
+ * Increments click count and returns redirect URL
+ */
+exports.trackClick = async (req, res) => {
+  try {
+    const product = await Product.findByIdAndUpdate(
+      req.params.id, 
+      { $inc: { clicks: 1 } }, 
+      { new: true }
+    );
+    if (!product) return res.status(404).json({ error: "Product not found" });
+    res.json({ success: true, redirectUrl: product.affiliateLink });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * GET PRODUCT BY ID
+ * Increments view count and returns single product
  */
 exports.getProductById = async (req, res) => {
   try {
-    const product = await Product.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } }, { new: true });
+    const product = await Product.findByIdAndUpdate(
+      req.params.id, 
+      { $inc: { views: 1 } }, 
+      { new: true }
+    );
     if (!product) return res.status(404).json({ error: "Product not found" });
     res.json({ success: true, product });
   } catch (error) {
@@ -113,17 +153,16 @@ exports.getProductById = async (req, res) => {
 };
 
 /**
- * Update product (Admin)
+ * UPDATE PRODUCT
  */
 exports.updateProduct = async (req, res) => {
   try {
     const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      { ...req.body, lastUpdated: new Date(), freshness: "FRESH" },
+      req.params.id, 
+      { ...req.body, lastUpdated: new Date() }, 
       { new: true }
     );
     if (!product) return res.status(404).json({ error: "Product not found" });
-    await exports.saveAndNotify(product);
     res.json({ success: true, product });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -131,7 +170,7 @@ exports.updateProduct = async (req, res) => {
 };
 
 /**
- * Delete product (Admin)
+ * DELETE PRODUCT
  */
 exports.deleteProduct = async (req, res) => {
   try {
@@ -144,48 +183,31 @@ exports.deleteProduct = async (req, res) => {
 };
 
 /**
- * Track affiliate click
+ * SAVE AND NOTIFY (Internal Helper)
  */
-exports.trackClick = async (req, res) => {
+exports.saveAndNotify = async (product) => {
   try {
-    const product = await Product.findByIdAndUpdate(req.params.id, { $inc: { clicks: 1 } }, { new: true });
-    if (!product) return res.status(404).json({ error: "Product not found" });
-    res.json({ success: true, redirectUrl: product.affiliateLink });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
+    const matches = await UserRequest.find({
+      "parsedTags.category": { $regex: product.category, $options: "i" },
+      isFulfilled: false,
+      status: "ACTIVE",
+    });
 
-/**
- * Get detailed product statistics (Admin Analytics)
- */
-exports.getProductStats = async (req, res) => {
-  try {
-    const stats = await Product.aggregate([
-      {
-        $group: {
-          _id: { platform: "$platform", category: "$category", title: "$title" },
-          avgPrice: { $avg: "$price" },
-          totalViews: { $sum: { $ifNull: ["$views", 0] } },
-          totalClicks: { $sum: { $ifNull: ["$clicks", 0] } },
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          platform: { $ifNull: ["$_id.platform", "OTHER"] },
-          category: { $ifNull: ["$_id.category", "General"] },
-          // Maps the internal title to the productName field the frontend expects
-          productName: { $ifNull: ["$_id.title", "Unknown Product"] }, 
-          avgPrice: { $round: ["$avgPrice", 2] },
-          totalViews: 1,
-          totalClicks: 1
+    for (const request of matches) {
+      if (request.parsedTags.maxPrice && product.price > request.parsedTags.maxPrice) continue;
+      try {
+        await sendProductNotification(request.userEmail, product);
+        if (!request.matchedProducts.includes(product._id)) {
+          request.matchedProducts.push(product._id);
         }
-      },
-      { $sort: { totalViews: -1 } }
-    ]);
-    res.json({ success: true, stats });
+        request.isFulfilled = true;
+        request.status = "FULFILLED"; 
+        await request.save();
+      } catch (err) {
+        console.error(`Notification failed for ${request.userEmail}:`, err.message);
+      }
+    }
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("SaveAndNotify internal error:", error);
   }
 };
