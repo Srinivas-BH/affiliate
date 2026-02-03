@@ -4,7 +4,7 @@ import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import HeartbeatTracker from "./components/HeartbeatTracker";
 
-// Pages
+// General Pages
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -15,11 +15,14 @@ import WishlistPage from "./pages/WishlistPage";
 import AboutPage from "./pages/AboutPage";
 import WriteToUsPage from "./pages/WriteToUsPage";
 import ProfilePage from "./pages/ProfilePage";
+
+// Admin Pages
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminProductsPage from "./pages/AdminProductsPage";
 import AdminUserRequestsPage from "./pages/AdminUserRequestsPage";
 import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
-import AdminUsersListPage from "./pages/AdminUsersListPage"; // New Page
+import AdminUsersListPage from "./pages/AdminUsersListPage";
+import MeeshoProductsPage from "./pages/MeeshoProductsPage"; // New Import
 
 import "./index.css";
 
@@ -29,11 +32,13 @@ function App() {
       <Router>
         <HeartbeatTracker />
         <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/admin/setup" element={<AdminSetupPage />} />
           
+          {/* Protected User Routes */}
           <Route
             path="/dashboard"
             element={
@@ -92,6 +97,18 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Specific Meesho Route (Integrated into Distribution View) */}
+          <Route
+            path="/admin/products/meesho"
+            element={
+              <ProtectedRoute adminOnly={true}>
+                <MeeshoProductsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* General Dynamic Platform Route */}
           <Route
             path="/admin/products/:platform?"
             element={
@@ -100,6 +117,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/admin/user-requests"
             element={
@@ -125,6 +143,7 @@ function App() {
             }
           />
 
+          {/* Fallback Route */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>
