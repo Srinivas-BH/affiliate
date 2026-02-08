@@ -13,25 +13,32 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// UPDATED CORS: Added support for local network IP so pings from other PCs work
+// CORS: Allow Frontend & Local Network
 app.use(
   cors({
     origin: [
       process.env.FRONTEND_URL || "http://localhost:3000",
       "http://localhost:3000",
-      /^http:\/\/192\.168\.\d+\.\d+:3000$/ // Allows any IP on your local network
+      /^http:\/\/192\.168\.\d+\.\d+:3000$/ 
     ],
     credentials: true,
   })
 );
 
-// MongoDB Connection
+// MongoDB Connection with Retry & Timeout Fixes
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/smart-affiliate");
+    const conn = await mongoose.connect(process.env.MONGO_URI || "mongodb://localhost:27017/smart-affiliate", {
+      // Fixes 'queryTxt ETIMEOUT' by forcing IPv4
+      family: 4, 
+      // timeouts
+      serverSelectionTimeoutMS: 5000, 
+    });
     console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
     console.error(`Error: ${error.message}`);
+    // If DB fails, we usually exit. 
+    // You can comment this out if you want the server to stay alive without DB.
     process.exit(1);
   }
 };
@@ -43,7 +50,6 @@ const authRoutes = require("./routes/authRoutes");
 const productRoutes = require("./routes/productRoutes");
 const userRequestRoutes = require("./routes/userRequestRoutes");
 
-// These routes now include the /heartbeat and /admin/stats endpoints
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/requests", userRequestRoutes);
@@ -52,8 +58,11 @@ app.use("/api/requests", userRequestRoutes);
 const { startAmazonPriceUpdater } = require("./jobs/amazonPriceUpdater");
 const { startPriceFreshnessManager } = require("./jobs/priceFreshnessManager");
 
-startAmazonPriceUpdater();
-startPriceFreshnessManager();
+// Start jobs only if DB connected (safe wrapper)
+mongoose.connection.once('open', () => {
+    startAmazonPriceUpdater();
+    startPriceFreshnessManager();
+});
 
 // Health check
 app.get("/api/health", (req, res) => {

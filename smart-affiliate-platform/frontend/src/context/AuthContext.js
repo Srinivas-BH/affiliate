@@ -20,7 +20,6 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem("user", JSON.stringify(response.user));
         } catch (error) {
           if (error.response?.status === 401) {
-            // Silently logout if token is invalid
             setUser(null);
             setToken(null);
             localStorage.removeItem("token");
@@ -54,14 +53,12 @@ export const AuthProvider = ({ children }) => {
   // [UPDATED] Logout: Notify backend -> Clear local data
   const logout = async () => {
     try {
-      // 1. Tell server to set lastActive to past
       if (token) {
         await api.post("/auth/logout");
       }
     } catch (error) {
       console.error("Logout server error:", error);
     } finally {
-      // 2. Always clear local state
       setUser(null);
       setToken(null);
       localStorage.removeItem("token");
@@ -69,13 +66,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Other utilities...
   const forgotPassword = (email) => api.post("/auth/forgot-password", { email });
   const resetPassword = (data) => api.post("/auth/reset-password", data);
   const updateProfile = async (data) => {
     const res = await api.put("/auth/profile", data);
     setUser(res.user);
-    localStorage.setItem("user", JSON.stringify(res.user)); // Ensure local storage is updated
+    localStorage.setItem("user", JSON.stringify(res.user));
     return res;
   };
 
