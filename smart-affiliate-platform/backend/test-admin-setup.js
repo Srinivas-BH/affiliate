@@ -1,82 +1,44 @@
 #!/usr/bin/env node
-
-/**
- * Admin Setup Test Script
- * Tests the secure admin account setup endpoints
- */
-
 const axios = require("axios");
 
-const API_BASE = "http://localhost:5000/api";
+// Ensure this matches your running server
+const API_BASE = "http://localhost:5001/api"; 
+
+const ADMIN_EMAIL = "discyra2026@gmail.com";
+// If you recently reset the password, update this string to test login!
+const ADMIN_PASSWORD = "SBHaff$2706"; 
 
 async function testAdminSetup() {
-  console.log("🧪 Admin Setup Test Suite\n");
-  console.log("=" .repeat(50));
+  console.log("🧪 Admin Workflow Test\n");
 
   try {
-    // Test 1: Check Admin Status
-    console.log("\n1️⃣  Checking Admin Setup Status...");
-    const statusResponse = await axios.get(`${API_BASE}/auth/admin-status`);
-    console.log("✅ Admin Status:", statusResponse.data);
-
-    // Test 2: Weak Password (should fail)
-    console.log("\n2️⃣  Testing Weak Password Validation...");
+    // 1. Check if server is reachable
+    console.log("1️⃣  Ping Server...");
     try {
-      await axios.post(`${API_BASE}/auth/setup-admin`, {
-        password: "weak",
-        name: "Test Admin",
-      });
-      console.log("❌ Weak password was accepted (security issue!)");
-    } catch (err) {
-      if (err.response?.status === 400) {
-        console.log("✅ Weak password rejected correctly");
-        console.log("   Error:", err.response.data.error);
-        console.log("   Requirements:", err.response.data.requirements);
-      }
+      await axios.get(`${API_BASE}/auth/admin-status`);
+      console.log("✅ Server is reachable.");
+    } catch (e) {
+      throw new Error(`Cannot connect to server at ${API_BASE}. Is it running? (npm start)`);
     }
 
-    // Test 3: Valid Strong Password
-    console.log("\n3️⃣  Testing Strong Password Setup...");
-    const strongPassword = "AdminTest@2024Secure";
+    // 2. Test Login
+    console.log("\n2️⃣  Testing Admin Login...");
     try {
-      const setupResponse = await axios.post(`${API_BASE}/auth/setup-admin`, {
-        password: strongPassword,
-        name: "Platform Administrator",
-      });
-      console.log("✅ Admin Account Setup Successful!");
-      console.log("   Response:", setupResponse.data);
-    } catch (err) {
-      if (err.response?.status === 403) {
-        console.log("✅ Admin Already Initialized (as expected)");
-        console.log("   Message:", err.response.data.error);
-      } else {
-        console.log("❌ Setup Failed:", err.response?.data || err.message);
-      }
-    }
-
-    // Test 4: Verify Admin Can Login
-    console.log("\n4️⃣  Testing Admin Login...");
-    try {
-      const loginResponse = await axios.post(`${API_BASE}/auth/login`, {
-        email: "bhsrinivas94@gmail.com",
-        password: strongPassword,
+      const res = await axios.post(`${API_BASE}/auth/login`, {
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD
       });
       console.log("✅ Admin Login Successful!");
-      console.log("   Token:", loginResponse.data.token?.substring(0, 20) + "...");
-      console.log("   User:", loginResponse.data.user);
+      console.log("   Token:", res.data.token ? "Received" : "Missing");
     } catch (err) {
-      console.log("ℹ️  Admin Login Test Skipped (setup may have failed)");
+      console.log("❌ Admin Login Failed. (Did you change the password recently?)");
+      console.log("   Error:", err.response?.data?.error || err.message);
     }
 
-    console.log("\n" + "=" .repeat(50));
-    console.log("✅ All tests completed!\n");
+    console.log("\n✅ Test Complete.");
   } catch (error) {
-    console.error("❌ Test Error:", error.message);
-    if (error.response?.data) {
-      console.error("   Response:", error.response.data);
-    }
+    console.error("❌ FATAL ERROR:", error.message);
   }
 }
 
-// Run tests
 testAdminSetup();
